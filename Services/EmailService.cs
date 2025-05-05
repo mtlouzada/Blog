@@ -10,8 +10,8 @@ public class EmailService
         string toEmail,
         string subject,
         string body,
-        string fromName = "Equipe balta.io",
-        string fromEmail = "email@balta.io")
+        string fromName = "Equipe do Blog",
+        string fromEmail = "blogEmail@gmail.com")
     {
         var smtpClient = new SmtpClient(Configuration.Smtp.Host, Configuration.Smtp.Port);
 
