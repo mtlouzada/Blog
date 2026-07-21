@@ -12,6 +12,8 @@ namespace Blog.Controllers
     [ApiController]
     public class CategoryController : ControllerBase
     {
+        internal const string CategoriesCacheKey = "CategoriesCache";
+
         [HttpGet("v1/categories")]
         public IActionResult GetAsync(
             [FromServices] IMemoryCache cache,
@@ -19,7 +21,7 @@ namespace Blog.Controllers
         {
             try
             {
-                var categories = cache.GetOrCreate("CategoriesCache", entry =>
+                var categories = cache.GetOrCreate(CategoriesCacheKey, entry =>
                 {
                     entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
                     return GetCategories(context);
@@ -63,7 +65,8 @@ namespace Blog.Controllers
         [HttpPost("v1/categories")]
         public async Task<IActionResult> PostAsync(
             [FromBody] EditorCategoryViewModel model,
-            [FromServices] BlogDataContext context)
+            [FromServices] BlogDataContext context,
+            [FromServices] IMemoryCache cache)
         {
             if (!ModelState.IsValid)
                 return BadRequest(new ResultViewModel<Category>(ModelState.GetErrors()));
@@ -79,9 +82,15 @@ namespace Blog.Controllers
                 await context.Categories.AddAsync(category);
                 await context.SaveChangesAsync();
 
+                cache.Remove(CategoriesCacheKey);
+
                 return Created($"v1/categories/{category.Id}", new ResultViewModel<Category>(category));
             }
-            catch (DbUpdateException ex)
+            catch (DbUpdateException ex) when (ex.IsUniqueViolation())
+            {
+                return Conflict(new ResultViewModel<Category>("05XE9 - Já existe uma categoria com este slug"));
+            }
+            catch (DbUpdateException)
             {
                 return StatusCode(500, new ResultViewModel<Category>("05XE9 - Não foi possível incluir a categoria"));
             }
@@ -95,7 +104,8 @@ namespace Blog.Controllers
         public async Task<IActionResult> PutAsync(
             [FromRoute] int id,
             [FromBody] EditorCategoryViewModel model,
-            [FromServices] BlogDataContext context)
+            [FromServices] BlogDataContext context,
+            [FromServices] IMemoryCache cache)
         {
             try
             {
@@ -112,9 +122,15 @@ namespace Blog.Controllers
                 context.Categories.Update(category);
                 await context.SaveChangesAsync();
 
+                cache.Remove(CategoriesCacheKey);
+
                 return Ok(new ResultViewModel<Category>(category));
             }
-            catch (DbUpdateException ex)
+            catch (DbUpdateException ex) when (ex.IsUniqueViolation())
+            {
+                return Conflict(new ResultViewModel<Category>("05XE8 - Já existe uma categoria com este slug"));
+            }
+            catch (DbUpdateException)
             {
                 return StatusCode(500, new ResultViewModel<Category>("05XE8 - Não foi possível alterar a categoria"));
             }
@@ -127,7 +143,8 @@ namespace Blog.Controllers
         [HttpDelete("v1/categories/{id:int}")]
         public async Task<IActionResult> DeleteAsync(
             [FromRoute] int id,
-            [FromServices] BlogDataContext context)
+            [FromServices] BlogDataContext context,
+            [FromServices] IMemoryCache cache)
         {
             try
             {
@@ -140,6 +157,8 @@ namespace Blog.Controllers
 
                 context.Categories.Remove(category);
                 await context.SaveChangesAsync();
+
+                cache.Remove(CategoriesCacheKey);
 
                 return Ok(new ResultViewModel<Category>(category));
             }
