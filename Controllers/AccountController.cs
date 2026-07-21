@@ -45,7 +45,7 @@ public class AccountController : ControllerBase
                 user = user.Email, password
             }));
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (ex.IsUniqueViolation())
         {
             return StatusCode(400, new ResultViewModel<string>("05X99 - Este E-mail já está cadastrado"));
         }
@@ -91,17 +91,23 @@ public class AccountController : ControllerBase
     [HttpPost("v1/accounts/upload-image")]
     public async Task<IActionResult> UploadImage(
         [FromBody] UploadImageViewModel model,
-        [FromServices] BlogDataContext context)
+        [FromServices] BlogDataContext context,
+        [FromServices] IWebHostEnvironment environment)
     {
         var fileName = $"{Guid.NewGuid().ToString()}.jpg";
         var data = new Regex(@"^data:image\/[a-z]+;base64,").Replace(model.Base64Image, "");
         var bytes = Convert.FromBase64String(data);
 
+        // O caminho tem que sair da raiz web da aplicação. Relativo, ele dependia do
+        // diretório de trabalho do processo — o que só coincide em `dotnet run`.
+        var imagesPath = Path.Combine(environment.WebRootPath, "images");
+
         try
         {
-            await System.IO.File.WriteAllBytesAsync($"wwwroot/images/{fileName}", bytes);
+            Directory.CreateDirectory(imagesPath);
+            await System.IO.File.WriteAllBytesAsync(Path.Combine(imagesPath, fileName), bytes);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             return StatusCode(500, new ResultViewModel<string>("05X04 - Falha interna no servidor"));
         }
@@ -113,13 +119,13 @@ public class AccountController : ControllerBase
         if (user == null)
             return NotFound(new ResultViewModel<Category>("Usuário não encontrado"));
 
-        user.Image = $"https://localhost:0000/images/{fileName}";
+        user.Image = $"{Request.Scheme}://{Request.Host}/images/{fileName}";
         try
         {
             context.Users.Update(user);
             await context.SaveChangesAsync();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             return StatusCode(500, new ResultViewModel<string>("05X04 - Falha interna no servidor"));
         }
