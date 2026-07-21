@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-and-test:
+    name: Build e testes de integração
+    runs-on: ubuntu-latest
+
+    # Os testes rodam contra um SQL Server de verdade, o mesmo motor usado em
+    # produção. Localmente o papel deste container é feito pelo LocalDB.
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "Blog!Tests2026"
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Blog!Tests2026' -Q 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      BLOG_TESTS_SQLSERVER: "Server=localhost,1433;User Id=sa;Password=Blog!Tests2026;TrustServerCertificate=true;"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore Blog.sln
+
+      - name: Build
+        run: dotnet build Blog.sln --configuration Release --no-restore
+
+      - name: Testes de integração
+        run: >-
+          dotnet test tests/Blog.IntegrationTests/Blog.IntegrationTests.csproj
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=integration-tests.trx"
+          --results-directory ./test-results
+
+      - name: Publicar resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./test-results
