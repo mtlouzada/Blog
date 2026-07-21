@@ -93,5 +93,11 @@ void ConfigureServices(WebApplicationBuilder builder)
         options.UseSqlServer(connectionString));
 
     builder.Services.AddTransient<TokenService>();
-    builder.Services.AddTransient<EmailService>();
+    builder.Services.AddTransient<IEmailService, EmailService>();
+}
+
+// Torna a classe gerada pelos top-level statements visível para o
+// WebApplicationFactory<Program> usado nos testes de integração.
+public partial class Program
+{
 }

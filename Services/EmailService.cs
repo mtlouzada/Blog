@@ -3,7 +3,7 @@ using System.Net.Mail;
 
 namespace Blog.Services;
 
-public class EmailService
+public class EmailService : IEmailService
 {
     public bool Send(
         string toName,

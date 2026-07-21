@@ -19,7 +19,7 @@ public class AccountController : ControllerBase
     public async Task<IActionResult> Post(
         [FromBody] RegisterViewModel model,
         [FromServices] BlogDataContext context,
-        [FromServices] EmailService emailService)
+        [FromServices] IEmailService emailService)
     {
         if (!ModelState.IsValid)
             return BadRequest(new ResultViewModel<string>(ModelState.GetErrors()));
