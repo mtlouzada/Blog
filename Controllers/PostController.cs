@@ -33,9 +33,11 @@ public class PostController : ControllerBase
                     Category = x.Category.Name,
                     Author = $"{x.Author.Name} ({x.Author.Email})"
                 })
+                // Ordenar antes de paginar: invertido, cada página era ordenada
+                // isoladamente e a "primeira página" não trazia os posts mais recentes.
+                .OrderByDescending(x => x.LastUpdateDate)
                 .Skip(page * pageSize)
                 .Take(pageSize)
-                .OrderByDescending(x => x.LastUpdateDate)
                 .ToListAsync();
             return Ok(new ResultViewModel<dynamic>(new
             {
@@ -86,7 +88,13 @@ public class PostController : ControllerBase
     {
         try
         {
-            var count = await context.Posts.AsNoTracking().CountAsync();
+            // O total precisa refletir o mesmo filtro da consulta: contar todos os
+            // posts do blog faria o cliente paginar sobre um número inexistente.
+            var count = await context
+                .Posts
+                .AsNoTracking()
+                .CountAsync(x => x.Category.Slug == category);
+
             var posts = await context
                 .Posts
                 .AsNoTracking()
@@ -102,9 +110,9 @@ public class PostController : ControllerBase
                     Category = x.Category.Name,
                     Author = $"{x.Author.Name} ({x.Author.Email})"
                 })
+                .OrderByDescending(x => x.LastUpdateDate)
                 .Skip(page * pageSize)
                 .Take(pageSize)
-                .OrderByDescending(x => x.LastUpdateDate)
                 .ToListAsync();
             return Ok(new ResultViewModel<dynamic>(new
             {
